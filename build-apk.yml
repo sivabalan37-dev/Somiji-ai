@@ -1,0 +1,307 @@
+name: Build Somiji AI APK
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Write project files
+        run: |
+          mkdir -p proj/app/src/main/{java/com/somiji/ai,assets,res/drawable,res/mipmap-anydpi-v26,res/values}
+          cd proj
+          cat > settings.gradle <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositories { google(); mavenCentral() } }
+          rootProject.name = 'SomijiAI'
+          include ':app'
+          EOF
+          cat > build.gradle <<'EOF'
+          plugins { id 'com.android.application' version '8.5.2' apply false }
+          EOF
+          cat > app/build.gradle <<'EOF'
+          plugins { id 'com.android.application' }
+          android {
+            namespace = 'com.somiji.ai'
+            compileSdk = 34
+            defaultConfig { applicationId = 'com.somiji.ai'; minSdk = 26; targetSdk = 34; versionCode = 1; versionName = '1.0' }
+            compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+          }
+          EOF
+          cat > app/src/main/res/values/colors.xml <<'EOF'
+          <resources><color name="bg">#140A04</color></resources>
+          EOF
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml <<'EOF'
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@color/bg"/><foreground android:drawable="@drawable/ic_fg"/></adaptive-icon>
+          EOF
+          cat > app/src/main/res/drawable/ic_fg.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+            <path android:fillColor="#FF8A00" android:pathData="M24,54a30,30 0 1,0 60,0a30,30 0 1,0 -60,0z"/>
+            <path android:fillColor="#66FFE0A0" android:pathData="M35,41a8,8 0 1,0 16,0a8,8 0 1,0 -16,0z"/>
+            <group android:translateX="54" android:translateY="40.5" android:scaleX="0.68" android:scaleY="0.68"><path android:fillColor="#D21A0F" android:pathData="M0,-10L2.25,-3.09L9.51,-3.09L3.63,1.18L5.88,8.09L0,3.82L-5.88,8.09L-3.63,1.18L-9.51,-3.09L-2.25,-3.09Z"/></group>
+            <group android:translateX="67.5" android:translateY="54" android:scaleX="0.68" android:scaleY="0.68"><path android:fillColor="#D21A0F" android:pathData="M0,-10L2.25,-3.09L9.51,-3.09L3.63,1.18L5.88,8.09L0,3.82L-5.88,8.09L-3.63,1.18L-9.51,-3.09L-2.25,-3.09Z"/></group>
+            <group android:translateX="54" android:translateY="67.5" android:scaleX="0.68" android:scaleY="0.68"><path android:fillColor="#D21A0F" android:pathData="M0,-10L2.25,-3.09L9.51,-3.09L3.63,1.18L5.88,8.09L0,3.82L-5.88,8.09L-3.63,1.18L-9.51,-3.09L-2.25,-3.09Z"/></group>
+            <group android:translateX="40.5" android:translateY="54" android:scaleX="0.68" android:scaleY="0.68"><path android:fillColor="#D21A0F" android:pathData="M0,-10L2.25,-3.09L9.51,-3.09L3.63,1.18L5.88,8.09L0,3.82L-5.88,8.09L-3.63,1.18L-9.51,-3.09L-2.25,-3.09Z"/></group>
+          </vector>
+          EOF
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+            <queries>
+              <intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent>
+              <intent><action android:name="android.speech.RecognitionService"/></intent>
+              <intent><action android:name="android.intent.action.TTS_SERVICE"/></intent>
+            </queries>
+            <application android:label="Somiji AI" android:icon="@mipmap/ic_launcher" android:theme="@android:style/Theme.Material.NoActionBar">
+              <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize|keyboardHidden">
+                <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          EOF
+          cat > app/src/main/java/com/somiji/ai/MainActivity.java <<'EOF'
+          package com.somiji.ai;
+
+          import android.Manifest;
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.content.pm.PackageManager;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.speech.RecognitionListener;
+          import android.speech.RecognizerIntent;
+          import android.speech.SpeechRecognizer;
+          import android.speech.tts.TextToSpeech;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.WebView;
+          import java.io.InputStream;
+          import java.net.HttpURLConnection;
+          import java.net.URL;
+          import java.util.ArrayList;
+          import java.util.Locale;
+          import java.util.Scanner;
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+
+          public class MainActivity extends Activity {
+            WebView w;
+            TextToSpeech tts;
+            SpeechRecognizer sr;
+            SharedPreferences sp;
+            JSONArray hist = new JSONArray();
+            static final String SYS = "You are Somiji AI, a friendly voice assistant on an Android phone for a Tamil-speaking user. Reply in the language and script the user used (Tamil script, Tanglish or English). Keep it to 1-3 short sentences, plain text, no markdown, no emojis. You cannot read the user's Gmail, calendar or phone data. To open apps the user says: open <app name>.";
+
+            @Override protected void onCreate(Bundle s) {
+              super.onCreate(s);
+              sp = getSharedPreferences("s", 0);
+              tts = new TextToSpeech(this, null);
+              w = new WebView(this);
+              w.getSettings().setJavaScriptEnabled(true);
+              w.getSettings().setDomStorageEnabled(true);
+              w.addJavascriptInterface(new B(), "Android");
+              setContentView(w);
+              w.loadUrl("file:///android_asset/index.html");
+              if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
+                requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 1);
+            }
+
+            void js(String f, String a) {
+              w.post(() -> w.evaluateJavascript(f + "(" + JSONObject.quote(a) + ")", null));
+            }
+
+            class B {
+              @JavascriptInterface public boolean hasKey() { return sp.getString("k", "").length() > 0; }
+              @JavascriptInterface public void setKey(String k) { sp.edit().putString("k", k.trim()).apply(); }
+              @JavascriptInterface public void speak(String t, String lang) {
+                tts.setLanguage(Locale.forLanguageTag(lang));
+                tts.speak(t, TextToSpeech.QUEUE_FLUSH, null, "s");
+              }
+              @JavascriptInterface public void stop() { runOnUiThread(() -> { if (sr != null) sr.stopListening(); }); }
+              @JavascriptInterface public void openApp(String pkg, String fb) {
+                runOnUiThread(() -> {
+                  Intent i = getPackageManager().getLaunchIntentForPackage(pkg);
+                  if (i == null) i = new Intent(Intent.ACTION_VIEW, Uri.parse(fb));
+                  try { startActivity(i); } catch (Exception e) { }
+                });
+              }
+              @JavascriptInterface public void view(String u) {
+                runOnUiThread(() -> { try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(u))); } catch (Exception e) { } });
+              }
+              @JavascriptInterface public void listen(String lang) { runOnUiThread(() -> startListen(lang)); }
+              @JavascriptInterface public void ask(String t) { new Thread(() -> chat(t)).start(); }
+            }
+
+            void startListen(String lang) {
+              if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { js("onErr", "mic"); return; }
+              if (!SpeechRecognizer.isRecognitionAvailable(this)) { js("onErr", "none"); return; }
+              if (sr != null) sr.destroy();
+              sr = SpeechRecognizer.createSpeechRecognizer(this);
+              sr.setRecognitionListener(new RecognitionListener() {
+                String first(Bundle r) {
+                  ArrayList<String> a = r.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                  return a != null && a.size() > 0 ? a.get(0) : "";
+                }
+                public void onResults(Bundle r) { js("onHeard", first(r)); }
+                public void onPartialResults(Bundle r) { js("onPart", first(r)); }
+                public void onError(int e) { js("onHeard", ""); }
+                public void onReadyForSpeech(Bundle p) { }
+                public void onBeginningOfSpeech() { }
+                public void onRmsChanged(float v) { }
+                public void onBufferReceived(byte[] b) { }
+                public void onEndOfSpeech() { }
+                public void onEvent(int t, Bundle p) { }
+              });
+              Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+              i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+              i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang);
+              i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+              sr.startListening(i);
+            }
+
+            void chat(String t) {
+              String out;
+              try {
+                hist.put(new JSONObject().put("role", "user").put("content", t));
+                JSONObject b = new JSONObject().put("model", "claude-haiku-5-5").put("max_tokens", 300).put("system", SYS).put("messages", hist);
+                HttpURLConnection c = (HttpURLConnection) new URL("https://api.anthropic.com/v1/messages").openConnection();
+                c.setRequestMethod("POST");
+                c.setDoOutput(true);
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(60000);
+                c.setRequestProperty("content-type", "application/json");
+                c.setRequestProperty("x-api-key", sp.getString("k", ""));
+                c.setRequestProperty("anthropic-version", "2023-06-01");
+                c.getOutputStream().write(b.toString().getBytes("UTF-8"));
+                int code = c.getResponseCode();
+                InputStream is = code < 400 ? c.getInputStream() : c.getErrorStream();
+                String r = new Scanner(is, "UTF-8").useDelimiter("\\A").next();
+                if (code >= 400) {
+                  hist.remove(hist.length() - 1);
+                  String m = r;
+                  try { m = new JSONObject(r).getJSONObject("error").getString("message"); } catch (Exception e) { }
+                  out = "Error " + code + ": " + m;
+                } else {
+                  out = new JSONObject(r).getJSONArray("content").getJSONObject(0).getString("text");
+                  hist.put(new JSONObject().put("role", "assistant").put("content", out));
+                  while (hist.length() > 12) { hist.remove(0); hist.remove(0); }
+                }
+              } catch (Exception e) {
+                if (hist.length() % 2 == 1) hist.remove(hist.length() - 1);
+                out = "Error: " + e.getMessage();
+              }
+              js("onAnswer", out);
+            }
+          }
+          EOF
+          cat > app/src/main/assets/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="ta"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Somiji AI</title>
+          <style>
+          :root{--bg:#fff6ec;--card:#ffe3c7;--tx:#2b1406;--ac:#ff7a00;--me:#ffd0a0;--ln:#f0c9a3;color-scheme:light}
+          @media(prefers-color-scheme:dark){:root{--bg:#140a04;--card:#26150a;--tx:#fff1e0;--me:#5a2e0a;--ln:#3a2210;color-scheme:dark}}
+          html,body{height:100%;margin:0}
+          body{background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+          header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--ln)}
+          header svg{width:42px;height:42px;flex:none}
+          h1{font-size:20px;margin:0;flex:1}
+          button{font:inherit;color:inherit}
+          header button,#chips button,#save{border:1px solid var(--ln);background:var(--card);border-radius:999px;padding:6px 12px}
+          #chips{display:flex;gap:8px;overflow-x:auto;padding:8px 14px;flex:none}
+          #chips button{flex:none;font-size:14px}
+          #kb{display:none;gap:8px;padding:8px 14px}
+          #key{flex:1;min-width:0;border:1px solid var(--ln);background:var(--card);color:inherit;border-radius:12px;padding:8px 12px;font:inherit}
+          #log{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:8px}
+          .m{max-width:85%;padding:9px 13px;border-radius:16px;background:var(--card);align-self:flex-start;white-space:pre-wrap;overflow-wrap:anywhere}
+          .m.me{align-self:flex-end;background:var(--me)}
+          #bar{display:flex;gap:8px;align-items:center;padding:10px 14px;border-top:1px solid var(--ln)}
+          #t{flex:1;min-width:0;border:1px solid var(--ln);background:var(--card);color:inherit;border-radius:999px;padding:11px 16px;font:inherit}
+          #send{border:0;background:none;font-size:22px;color:var(--ac)}
+          #mic{width:60px;height:60px;border-radius:50%;border:0;flex:none;background:radial-gradient(circle at 35% 30%,#ffd27a,#ff7a00 70%,#b83d00);box-shadow:0 0 0 0 rgba(255,122,0,.5);font-size:26px}
+          #mic.on{animation:p 1.1s infinite}
+          @keyframes p{70%{box-shadow:0 0 0 18px rgba(255,122,0,0)}100%{box-shadow:0 0 0 0 rgba(255,122,0,0)}}
+          </style></head>
+          <body>
+          <header>
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Somiji AI logo"><defs><radialGradient id="g" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffe9a0"/><stop offset=".35" stop-color="#ffa01c"/><stop offset=".75" stop-color="#f06400"/><stop offset="1" stop-color="#a83600"/></radialGradient><path id="s" d="M0-10L2.25-3.09 9.51-3.09 3.63 1.18 5.88 8.09 0 3.82-5.88 8.09-3.63 1.18-9.51-3.09-2.25-3.09Z"/></defs><circle cx="50" cy="50" r="47" fill="url(#g)" stroke="#8f2d00" stroke-width="2"/><ellipse cx="34" cy="24" rx="16" ry="8" fill="#fff" opacity=".3" transform="rotate(-30 34 24)"/><g fill="#d21a0f" stroke="#8f1000" stroke-width=".4"><use href="#s" transform="translate(50 29) scale(1.05)"/><use href="#s" transform="translate(71 50) scale(1.05)"/><use href="#s" transform="translate(50 71) scale(1.05)"/><use href="#s" transform="translate(29 50) scale(1.05)"/></g></svg>
+          <h1>Somiji AI</h1><button id="gear">⚙</button><button id="lang">தமிழ்</button>
+          </header>
+          <div id="kb"><input id="key" type="password" placeholder="Paste Anthropic API key"><button id="save">Save</button></div>
+          <div id="chips"></div>
+          <div id="log"></div>
+          <div id="bar"><input id="t" placeholder="Type pannunga…" autocomplete="off"><button id="send">➤</button><button id="mic">🎤</button></div>
+          <script>
+          const $=s=>document.querySelector(s),log=$('#log'),inp=$('#t'),mic=$('#mic'),kb=$('#kb');
+          const APPS={
+          gmail:['Gmail','com.google.android.gm','https://mail.google.com',['gmail','mail','ஜிமெயில்','மெயில்']],
+          calendar:['Calendar','com.google.android.calendar','https://calendar.google.com',['calendar','கேலண்டர்','காலண்டர்']],
+          maps:['Maps','com.google.android.apps.maps','https://maps.google.com',['maps','map','மேப்']],
+          youtube:['YouTube','com.google.android.youtube','https://youtube.com',['youtube','யூடியூப்','யூட்யூப்']],
+          drive:['Drive','com.google.android.apps.docs','https://drive.google.com',['drive','டிரைவ்']],
+          photos:['Photos','com.google.android.apps.photos','https://photos.google.com',['photos','photo','போட்டோ']],
+          chrome:['Chrome','com.android.chrome','https://www.google.com',['chrome','browser','குரோம்']],
+          keep:['Keep','com.google.android.keep','https://keep.google.com',['keep','notes','நோட்ஸ்']],
+          meet:['Meet','com.google.android.apps.tachyon','https://meet.google.com',['meet','மீட்']],
+          whatsapp:['WhatsApp','com.whatsapp','https://web.whatsapp.com',['whatsapp','வாட்ஸ்அப்','வாட்சப்']],
+          messages:['Messages','com.google.android.apps.messaging','https://messages.google.com',['messages','sms','மெசேஜ்']],
+          clock:['Clock','com.google.android.deskclock','https://www.google.com/search?q=timer',['clock','alarm','அலாரம்']],
+          play:['Play Store','com.android.vending','https://play.google.com',['play store','playstore','பிளே ஸ்டோர்']]
+          };
+          function add(c,t){const d=document.createElement('div');d.className='m '+c;d.textContent=t;log.appendChild(d);log.scrollTop=log.scrollHeight;return d}
+          function speak(t){t=t.replace(/[*_#`]/g,'');Android.speak(t,/[\u0B80-\u0BFF]/.test(t)?'ta-IN':'en-IN')}
+          function openApp(k){Android.openApp(APPS[k][1],APPS[k][2])}
+          for(const k of ['gmail','calendar','maps','youtube','drive','photos','keep','whatsapp']){const b=document.createElement('button');b.textContent=APPS[k][0];b.onclick=()=>openApp(k);$('#chips').appendChild(b)}
+          function route(t){
+          const l=t.toLowerCase();
+          if(/open|launch|start|ஓபன்|திற|தொற/.test(l))for(const k in APPS)if(APPS[k][3].some(a=>l.includes(a))){add('bot','Opening '+APPS[k][0]+'…');speak('Opening '+APPS[k][0]);openApp(k);return 1}
+          let m=l.match(/(?:call|dial)\s+([+\d][\d\s-]{5,})/);
+          if(m){const n=m[1].replace(/[\s-]/g,'');add('bot','Calling '+n+'…');Android.view('tel:'+n);return 1}
+          m=l.match(/(?:navigate to|directions to|take me to)\s+(.+)/);
+          if(m){add('bot','Maps: '+m[1]);Android.view('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(m[1]));return 1}
+          return 0}
+          let pend=null,on=0,lg='ta-IN';
+          function handle(t){t=(t||'').trim();if(!t)return;add('me',t);if(route(t))return;
+          if(!Android.hasKey()){add('bot','Paste your Anthropic API key first (⚙ button).');kb.style.display='flex';return}
+          pend=add('bot','…');Android.ask(t)}
+          function onAnswer(a){if(pend){pend.textContent=a;pend=null}else add('bot',a);if(a.indexOf('Error')!==0)speak(a)}
+          function onPart(s){inp.value=s}
+          function onHeard(s){on=0;mic.classList.remove('on');inp.value='';handle(s)}
+          function onErr(e){on=0;mic.classList.remove('on');add('bot',e==='mic'?'Allow the microphone for Somiji AI in Android settings.':'Speech recognition is not available on this phone.')}
+          mic.onclick=()=>{if(on){Android.stop();return}on=1;mic.classList.add('on');Android.listen(lg)};
+          $('#lang').onclick=e=>{lg=lg==='ta-IN'?'en-IN':'ta-IN';e.target.textContent=lg==='ta-IN'?'தமிழ்':'English'};
+          $('#gear').onclick=()=>{kb.style.display=kb.style.display==='flex'?'none':'flex'};
+          $('#save').onclick=()=>{const v=$('#key').value.trim();if(!v)return;Android.setKey(v);$('#key').value='';kb.style.display='none';add('bot','API key saved.')};
+          $('#send').onclick=()=>{const t=inp.value;inp.value='';handle(t)};
+          inp.onkeydown=e=>{if(e.key==='Enter')$('#send').click()};
+          add('bot','வணக்கம்! நான் Somiji AI. “open Gmail” nu sollunga, illa edhaavadhu kelunga.');
+          if(!Android.hasKey()){add('bot','AI pathil-ku first ⚙ press panni Anthropic API key paste pannunga.');kb.style.display='flex'}
+          </script>
+          </body></html>
+          EOF
+      - name: Build APK
+        working-directory: proj
+        run: |
+          gradle assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk SomijiAI.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SomijiAI-apk
+          path: proj/SomijiAI.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Somiji AI v${{ github.run_number }}
+          files: proj/SomijiAI.apk
