@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SOMIJI AI</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<style>
+:root{--bg:#0b0e1a;--panel:#121729;--line:#232a44;--text:#e9ecf8;--mute:#8d96b8;--acc:#7b6cff;--acc2:#2fe0c0;--r:14px;color-scheme:dark}
+[data-theme=light]{--bg:#f5f6fb;--panel:#fff;--line:#dfe2ef;--text:#151a30;--mute:#5d6685;--acc:#5b4bdb;--acc2:#0fa890;color-scheme:light}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:flex;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,select,textarea,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:2px solid var(--acc2);outline-offset:2px}
+#side{width:280px;flex:none;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:14px;gap:10px;transition:transform .25s}
+.brand{display:flex;align-items:center;gap:10px;font:700 18px "Avenir Next","Trebuchet MS",sans-serif;letter-spacing:.02em}
+.brand img{width:34px;height:34px}
+.btn{padding:10px 14px;border-radius:var(--r);border:1px solid var(--line);text-align:left}
+.btn:hover{border-color:var(--acc)}
+.primary{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border:0;font-weight:600}
+#chats{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.ci{display:flex;align-items:center;border-radius:10px}
+.ci button:first-child{flex:1;min-width:0;text-align:left;padding:9px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci:hover,.ci.on{background:color-mix(in srgb,var(--acc) 16%,transparent)}
+.ci .x{padding:6px 10px;color:var(--mute)}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+#menu{display:none;font-size:22px}
+select{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 10px;max-width:60%}
+#log{flex:1;overflow:auto;padding:20px 14px}
+.w{max-width:760px;margin:0 auto}
+.m{margin:0 0 18px;overflow-wrap:anywhere}
+.m.user{background:var(--acc);color:#fff;padding:10px 14px;border-radius:var(--r) var(--r) 4px var(--r);margin-left:auto;width:fit-content;max-width:85%;white-space:pre-wrap}
+.m.err{color:#ff7b8a}
+.m pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;font-size:14px}
+.m code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.92em}
+.m :not(pre)>code{background:var(--panel);padding:1px 5px;border-radius:5px}
+.tools{display:flex;gap:14px;margin-top:4px;font-size:13px;color:var(--mute)}
+.tools button{color:var(--mute)}
+.user .tools{color:#ffffffcc}
+.dots span{display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:var(--acc2);animation:b 1s infinite}
+.dots span:nth-child(2){animation-delay:.15s}.dots span:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1.1)}}
+.empty{text-align:center;margin-top:10vh;color:var(--mute)}
+.empty img{width:84px;height:84px;animation:f 4s ease-in-out infinite}
+.empty h1{color:var(--text);font:700 26px "Avenir Next","Trebuchet MS",sans-serif}
+@keyframes f{50%{transform:translateY(-6px)}}
+#f{padding:10px 14px calc(14px + env(safe-area-inset-bottom))}
+.box{max-width:760px;margin:0 auto;display:flex;align-items:flex-end;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:6px 8px}
+.box:focus-within{border-color:var(--acc)}
+textarea{flex:1;border:0;background:none;resize:none;max-height:180px;padding:9px 4px;outline:0}
+.ic{width:40px;height:40px;border-radius:50%;font-size:18px;flex:none}
+.ic:hover{background:color-mix(in srgb,var(--acc) 18%,transparent)}
+.ic.primary:hover{background:linear-gradient(135deg,var(--acc),var(--acc2));filter:brightness(1.1)}
+.ic.rec{background:#e5484d;color:#fff;animation:p 1.1s infinite}
+@keyframes p{50%{box-shadow:0 0 0 8px #e5484d33}}
+.chips{max-width:760px;margin:0 auto 6px;display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:13px;border:1px solid var(--line);border-radius:99px;padding:2px 10px;background:var(--panel)}
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:var(--r);width:min(440px,92vw)}
+dialog::backdrop{background:#0008}
+dialog label{display:block;margin:12px 0 4px;color:var(--mute);font-size:14px}
+dialog textarea,dialog input[type=text],dialog select{width:100%;max-width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px}
+@media(max-width:800px){#side{position:fixed;inset:0 auto 0 0;z-index:5;transform:translateX(-100%)}#side.open{transform:none}#menu{display:block}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<aside id="side">
+ <div class="brand"><img src="/logo.svg" alt="">SOMIJI AI</div>
+ <button class="btn primary" id="new">+ New chat</button>
+ <nav id="chats" aria-label="Chat history"></nav>
+ <button class="btn" id="gear">Settings</button>
+</aside>
+<main>
+ <header><button id="menu" aria-label="Open menu">☰</button><select id="model" aria-label="Model"></select></header>
+ <div id="log"><div class="w" id="msgs"></div></div>
+ <form id="f">
+  <div class="chips" id="chips"></div>
+  <div class="box">
+   <button type="button" class="ic" id="att" aria-label="Attach a file or image">📎</button>
+   <textarea id="in" rows="1" placeholder="Message SOMIJI AI" aria-label="Message"></textarea>
+   <button type="button" class="ic" id="mic" aria-label="Voice input">🎤</button>
+   <button class="ic primary" id="send" aria-label="Send">➤</button>
+  </div>
+  <input type="file" id="file" multiple hidden accept="image/*,.txt,.md,.json,.csv,.py,.js,.ts,.html,.css,.java,.c,.cpp,.go,.rs,.sh,.yml,.yaml,.xml,.sql">
+ </form>
+</main>
+<dialog id="set"><form method="dialog">
+ <h2 style="margin:0 0 4px">Settings</h2>
+ <label for="theme">Theme</label><select id="theme"><option value="dark">Dark</option><option value="light">Light</option></select>
+ <label for="uname">Your name</label><input type="text" id="uname" autocomplete="off">
+ <label for="sys">Custom instructions</label><textarea id="sys" rows="4" placeholder="For example: keep answers short and prefer Python."></textarea>
+ <label><input type="checkbox" id="auto"> Read replies aloud</label>
+ <p style="text-align:right;margin:16px 0 0"><button class="btn primary">Save</button></p>
+</form></dialog>
+<script>
+const $=s=>document.querySelector(s),LS=localStorage;
+const load=(k,d)=>{try{return JSON.parse(LS.getItem(k))??d}catch{return d}};
+let chats=load('somiji.chats',[]),cur=null,files=[],busy=null,rec=null,demoOnly=false;
+const cfg={theme:'dark',uname:'',sys:'',auto:false,model:'',...load('somiji.cfg',{})};
+const save=()=>{try{LS.setItem('somiji.chats',JSON.stringify(chats.map(c=>({...c,msgs:c.msgs.map(({images,...m})=>m)}))));LS.setItem('somiji.cfg',JSON.stringify(cfg))}catch{}};
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const mk=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x)e.textContent=x;return e};
+const down=()=>{const l=$('#log');l.scrollTop=l.scrollHeight};
+const grow=()=>{const t=$('#in');t.style.height='auto';t.style.height=Math.min(t.scrollHeight,180)+'px'};
+const theme=()=>{document.documentElement.dataset.theme=cfg.theme};
+const dots=()=>{const d=mk('div','dots');d.innerHTML='<span></span><span></span><span></span>';return d};
+
+function md(t){
+ const box=mk('div');
+ t.split('```').forEach((p,i)=>{
+  if(i%2){const nl=p.indexOf('\n'),pre=mk('pre'),c=mk('code',0,(nl>=0?p.slice(nl+1):p).replace(/\n$/,''));pre.append(c);box.append(pre)}
+  else if(p.trim()){const d=mk('div');d.innerHTML=esc(p).replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');box.append(d)}
+ });
+ return box}
+
+function speak(t){
+ if(!('speechSynthesis' in window)){alert('Text-to-speech is not supported in this browser.');return}
+ speechSynthesis.cancel();
+ speechSynthesis.speak(new SpeechSynthesisUtterance(t.replace(/```[\s\S]*?```/g,' code block. ').replace(/[`*]/g,'')))}
+
+function bubble(m){
+ const d=mk('div','m '+(m.err?'err':m.role));
+ if(m.role==='user'){d.append(m.text);if(m.names&&m.names.length)d.append(mk('div','tools','📎 '+m.names.join(', ')));return d}
+ if(m.err){d.textContent=m.text;return d}
+ d.append(md(m.text));
+ const t=mk('div','tools');
+ [['Listen',()=>speak(m.text)],['Copy',()=>navigator.clipboard&&navigator.clipboard.writeText(m.text)]].forEach(([l,f])=>{const b=mk('button',0,l);b.type='button';b.onclick=f;t.append(b)});
+ d.append(t);return d}
+
+function draw(){
+ const b=$('#msgs');b.replaceChildren();
+ if(!cur||!cur.msgs.length)b.innerHTML='<div class="empty"><img src="/logo.svg" alt=""><h1>What are we working on?</h1><p>Ask anything, attach a file, or tap the mic.</p>'+(demoOnly?'<p>Demo mode: add an API key to <code>.env</code> to chat with a real model.</p>':'')+'</div>';
+ else cur.msgs.forEach(m=>b.append(bubble(m)));
+ down()}
+
+function list(){
+ const n=$('#chats');n.replaceChildren();
+ chats.forEach(c=>{
+  const r=mk('div','ci'+(c===cur?' on':'')),b=mk('button',0,c.title),x=mk('button','x','✕');
+  b.onclick=()=>{cur=c;draw();list();$('#side').classList.remove('open')};
+  x.title=x.ariaLabel='Delete chat';
+  x.onclick=()=>{if(!confirm('Delete this chat?'))return;if(cur===c&&busy)busy.abort();chats=chats.filter(k=>k!==c);if(cur===c)cur=null;save();draw();list()};
+  r.append(b,x);n.append(r)})}
+
+function chip(){
+ const n=$('#chips');n.replaceChildren();
+ files.forEach((f,i)=>{const b=mk('button','chip',f.name+' ✕');b.type='button';b.onclick=()=>{files.splice(i,1);chip()};n.append(b)})}
+
+const rd=(f,k)=>new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;k==='text'?r.readAsText(f):r.readAsDataURL(f)});
+
+async function send(){
+ if(busy){busy.abort();return}
+ const text=$('#in').value.trim();
+ if(!text&&!files.length)return;
+ if(!cur){cur={id:Date.now().toString(36),title:'New chat',msgs:[]};chats.unshift(cur)}
+ const chat=cur,u={role:'user',text,ctx:'',names:files.map(f=>f.name),images:[]};
+ files.forEach(f=>f.img?u.images.push(f.img):u.ctx+='\n\n[Attached file: '+f.name+']\n```\n'+f.text+'\n```');
+ files=[];chip();$('#in').value='';grow();
+ chat.msgs.push(u);if(chat.title==='New chat')chat.title=(text||u.names[0]).slice(0,40);
+ const a={role:'assistant',text:''};chat.msgs.push(a);
+ draw();list();
+ const node=$('#msgs').lastChild;node.replaceChildren(dots());
+ busy=new AbortController();$('#send').textContent='■';
+ try{
+  const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:busy.signal,body:JSON.stringify({
+   model:$('#model').value,
+   system:[cfg.uname&&'The user\'s name is '+cfg.uname+'.',cfg.sys].filter(Boolean).join('\n'),
+   messages:chat.msgs.slice(0,-1).filter(m=>!m.err).map(m=>({role:m.role,text:m.text+(m.ctx||''),images:m.images||[]}))})});
+  if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'Server error '+r.status);
+  const rdr=r.body.getReader(),dec=new TextDecoder();let buf='';
+  for(;;){
+   const {done,value}=await rdr.read();if(done)break;
+   buf+=dec.decode(value,{stream:true});
+   let i;while((i=buf.indexOf('\n\n'))>=0){
+    const ev=buf.slice(0,i);buf=buf.slice(i+2);
+    if(!ev.startsWith('data:'))continue;
+    const j=JSON.parse(ev.slice(5));
+    if(j.error)throw new Error(j.error);
+    if(j.t){a.text+=j.t;if(chat===cur){node.replaceChildren(md(a.text));down()}}}}
+ }catch(e){if(e.name!=='AbortError'){a.err=true;a.text=(a.text?a.text+'\n\n':'')+e.message}}
+ busy=null;$('#send').textContent='➤';
+ if(!a.text)chat.msgs=chat.msgs.filter(m=>m!==a);
+ save();draw();list();
+ if(cfg.auto&&!a.err&&a.text)speak(a.text)}
+
+async function models(){
+ const s=$('#model');
+ try{
+  const r=await(await fetch('/api/models')).json();demoOnly=r.demoOnly;s.replaceChildren();
+  r.models.forEach(m=>{const o=mk('option',0,m.label);o.value=m.id;s.append(o)});
+  if([...s.options].some(o=>o.value===cfg.model))s.value=cfg.model;
+  draw()
+ }catch{s.replaceChildren(mk('option',0,'Server offline'))}}
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+$('#mic').onclick=()=>{
+ if(!SR){alert('Voice input is not supported in this browser. Try Chrome, Edge or Safari.');return}
+ if(rec){rec.stop();return}
+ rec=new SR();rec.lang=navigator.language;
+ rec.onresult=e=>{const t=Array.from(e.results).map(r=>r[0].transcript).join(' ');const i=$('#in');i.value+=(i.value?' ':'')+t;grow()};
+ rec.onend=rec.onerror=()=>{rec=null;$('#mic').classList.remove('rec')};
+ $('#mic').classList.add('rec');rec.start()};
+$('#att').onclick=()=>$('#file').click();
+$('#file').onchange=async e=>{
+ for(const f of e.target.files){
+  if(f.size>5e6){alert(f.name+' is larger than 5 MB.');continue}
+  if(f.type.startsWith('image/')){files.push({name:f.name,img:{mime:f.type,data:(await rd(f,'url')).split(',')[1]}});continue}
+  const t=await rd(f,'text');
+  if(t.includes('\0')){alert(f.name+' is not a text file or image.');continue}
+  files.push({name:f.name,text:t.slice(0,100000)})}
+ e.target.value='';chip()};
+$('#f').onsubmit=e=>{e.preventDefault();send()};
+$('#in').oninput=grow;
+$('#in').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&!/Android|iPhone|iPad|Mobi/i.test(navigator.userAgent)){e.preventDefault();send()}};
+$('#new').onclick=()=>{cur=null;draw();list();$('#side').classList.remove('open');$('#in').focus()};
+$('#menu').onclick=()=>$('#side').classList.toggle('open');
+$('main').onclick=e=>{if(!e.target.closest('#menu'))$('#side').classList.remove('open')};
+$('#model').onchange=e=>{cfg.model=e.target.value;save()};
+$('#gear').onclick=()=>{$('#theme').value=cfg.theme;$('#uname').value=cfg.uname;$('#sys').value=cfg.sys;$('#auto').checked=cfg.auto;$('#set').showModal()};
+$('#set').onclose=()=>{cfg.theme=$('#theme').value;cfg.uname=$('#uname').value.trim();cfg.sys=$('#sys').value.trim();cfg.auto=$('#auto').checked;theme();save()};
+theme();list();draw();models();
+</script>
+</body>
+</html>
