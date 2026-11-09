@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint --if-present
+
+      - name: Run tests
+        run: npm test --if-present
+
+      - name: Run build
+        run: npm run build --if-present
+
+      # Replace this with the actual Somiji AI command, package, or API call
+      - name: Run Somiji AI integration
+        env:
+          SOMIJI_API_KEY: ${{ secrets.SOMIJI_API_KEY }}
+        run: |
+          echo "Running Somiji AI integration..."
+          # Example:
+          # npm run somiji:validate
+          # python scripts/somiji_ai_check.py
+          # curl -X POST "$SOMIJI_API_URL" \
+          #   -H "Authorization: Bearer $SOMIJI_API_KEY" \
+          #   -H "Content-Type: application/json" \
+          #   -d '{"input":"CI validation"}'
